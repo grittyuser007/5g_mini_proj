@@ -1,0 +1,27 @@
+# Custom dataset for injury detection
+path: data/custom_dataset  # Dataset root directory
+train: images/train  # Train images (relative to 'path')
+val: images/val  # Validation images (relative to 'path')
+
+# Classes for multi-task classification
+names:
+  # Injury classes
+  0: burn
+  1: cut
+  2: bruise
+  3: fracture
+  4: sprain
+  5: head_injury
+  6: laceration
+  7: abrasion
+  8: no_injury
+  
+  # Age group classes
+  9: age_0_20
+  10: age_21_40
+  11: age_41_60
+  12: age_61_plus
+  
+  # Gender classes
+  13: male
+  14: female

@@ -1,0 +1,7 @@
+# Additional requirements for the Accident Analysis Agent
+# These should be added to the main requirements.txt or installed separately
+
+reportlab==4.0.4          # PDF generation
+geocoder==1.38.1           # Location detection
+pandas==2.0.3              # Data analysis (already in main requirements)
+numpy==1.24.3              # Array operations (already in main requirements)

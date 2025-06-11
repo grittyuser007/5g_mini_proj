@@ -155,10 +155,9 @@ class InjuryDetector:
                 "success": False,
                 "error": str(e)
             }
-    
     def _process_yolo_results(self, results, frame):
         """
-        Process YOLO detection results
+        Process YOLO detection results and map to injury types intelligently
         
         Args:
             results: YOLO detection results
@@ -173,58 +172,131 @@ class InjuryDetector:
         for result in results:
             boxes = result.boxes
             
+            if boxes is None:
+                continue
+                
             for box in boxes:
                 # Get bounding box coordinates
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
                 
                 # Get confidence score
                 confidence = float(box.conf[0].cpu().numpy())
-                
-                # Get class index
+                  # Get class index
                 class_idx = int(box.cls[0].cpu().numpy())
                 
-                # For demonstration, we'll map detected objects to injury types
-                # In a real implementation, you'd train a custom YOLO model for specific injuries
-                # Here we're simulating by mapping standard YOLO classes to injury types
-                
-                # YOLO v8 uses COCO dataset classes by default, with 80 classes
-                # We'll map some of these classes to injury types for demonstration
-                # In reality, you would train a custom model on injury data
-                
-                # Map some YOLO classes to our injury types (for demonstration)
-                # This is simplified - in reality, you would train a custom YOLO model
-                if class_idx < len(self.injury_classes):
-                    injury_type = self.injury_classes[class_idx]
-                else:
-                    # Randomly assign an injury type for demonstration
-                    import random
-                    injury_type = random.choice(self.injury_classes)
-                
-                # Get the region of interest (ROI) for age/gender detection
-                roi = frame[y1:y2, x1:x2]
-                
-                # Skip if ROI is empty or too small
-                if roi.size == 0 or roi.shape[0] < 10 or roi.shape[1] < 10:
-                    continue
-                
-                # Detect age and gender in the ROI
-                age_gender = self._detect_age_gender(roi)
-                  # Create a detection object
-                detection = {
-                    "success": True,
-                    "timestamp": datetime.now().isoformat(),
-                    "injury_type": injury_type,
-                    "confidence": confidence,
-                    "bbox": (x1, y1, x2, y2),
-                    "age": age_gender.get("age", "unknown"),
-                    "gender": age_gender.get("gender", "unknown"),
-                    "gender_confidence": age_gender.get("gender_confidence", 0),
-                    "age_group": age_gender.get("age_group", "unknown")
-                }
-                
-                detections.append(detection)
+                # Process detections from our trained model (classes: male, female, injury, no injury)
+                if confidence > 0.3:  # Lower threshold for our trained model
+                    
+                    # Map our model's classes to meaningful results
+                    if class_idx < len(self.injury_classes):
+                        detected_class = self.injury_classes[class_idx]
+                    else:
+                        # Fallback mapping for 10-class model
+                        class_mapping = {
+                            7: "female",  # female class
+                            8: "injury",  # injury class  
+                            9: "male",    # male class
+                            3: "no injury"  # No Injury class
+                        }
+                        detected_class = class_mapping.get(class_idx, "unknown")                    # Determine injury type and gender from detected class
+                    if detected_class in ["male", "female"]:
+                        gender = detected_class
+                        injury_type = "no injury"  # If we only detect gender, assume no injury
+                    elif detected_class == "injury":
+                        gender = "unknown"  # Will be determined by DeepFace
+                        injury_type = "injury"
+                    elif detected_class == "no injury":
+                        gender = "unknown"  # Will be determined by DeepFace
+                        injury_type = "no injury"
+                    else:
+                        gender = "unknown"
+                        injury_type = detected_class
+                    
+                    # Get the region of interest (ROI) for age/gender analysis
+                    roi = frame[y1:y2, x1:x2]
+                    
+                    # Skip if ROI is empty or too small
+                    if roi.size == 0 or roi.shape[0] < 20 or roi.shape[1] < 20:
+                        continue
+                    
+                    # Use DeepFace for more accurate age/gender if needed
+                    age_gender = self._detect_age_gender(roi)
+                    
+                    # Use DeepFace gender if we don't have it from detection
+                    if gender == "unknown" and age_gender.get("gender"):
+                        gender = age_gender.get("gender")
+                    
+                    # Create a detection object
+                    detection = {
+                        "success": True,
+                        "timestamp": datetime.now().isoformat(),
+                        "injury_type": injury_type,
+                        "confidence": confidence,
+                        "bbox": (x1, y1, x2, y2),
+                        "age": age_gender.get("age", "unknown"),
+                        "gender": gender,
+                        "gender_confidence": confidence if gender != "unknown" else age_gender.get("gender_confidence", 0),
+                        "age_group": age_gender.get("age_group", "unknown")
+                    }
+                    
+                    detections.append(detection)
         
         return detections
+    
+    def _analyze_injury_from_roi(self, roi):
+        """
+        Analyze ROI for potential injury types using image processing
+        
+        Args:
+            roi: Region of interest (cropped image)
+            
+        Returns:
+            str: Inferred injury type
+        """
+        try:
+            # Convert to different color spaces for analysis
+            hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+            lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
+            
+            # Analyze color characteristics
+            # Red areas might indicate cuts/blood
+            red_mask1 = cv2.inRange(hsv, np.array([0, 50, 50]), np.array([10, 255, 255]))
+            red_mask2 = cv2.inRange(hsv, np.array([170, 50, 50]), np.array([180, 255, 255]))
+            red_pixels = cv2.countNonZero(red_mask1) + cv2.countNonZero(red_mask2)
+            
+            # Dark/purple areas might indicate bruises
+            dark_mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 100]))
+            dark_pixels = cv2.countNonZero(dark_mask)
+            
+            # Bright/white areas might indicate bandages or medical attention
+            bright_mask = cv2.inRange(hsv, np.array([0, 0, 200]), np.array([180, 30, 255]))
+            bright_pixels = cv2.countNonZero(bright_mask)
+            
+            total_pixels = roi.shape[0] * roi.shape[1]
+            
+            if total_pixels == 0:
+                return "no_injury"
+            
+            # Calculate ratios
+            red_ratio = red_pixels / total_pixels
+            dark_ratio = dark_pixels / total_pixels  
+            bright_ratio = bright_pixels / total_pixels
+            
+            # Basic heuristics for injury classification
+            if red_ratio > 0.15:
+                return "cut"
+            elif dark_ratio > 0.4:
+                return "bruise" 
+            elif bright_ratio > 0.3:
+                return "laceration"  # Might be bandaged
+            elif red_ratio > 0.05 or dark_ratio > 0.2:
+                return "abrasion"
+            else:
+                return "no_injury"
+                
+        except Exception as e:
+            print(f"Error in injury analysis: {e}")
+            return "no_injury"
     def _detect_age_gender(self, frame):
         """
         Detect age and gender from a frame using DeepFace
@@ -347,9 +419,19 @@ class InjuryDetector:
                         injury_text = f"{detection['injury_type']} ({detection['confidence']:.2f})"
                         cv2.putText(annotated_frame, injury_text, (x1, y1 - 10),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-              # Draw primary detection information at the top of the frame
-            primary_text = f"Injury: {primary_detection['injury_type']} ({primary_detection['confidence']:.2f})"
-            person_text = f"Age: {primary_detection['age']} ({primary_detection['age_group']}), Gender: {primary_detection['gender']}"
+              # Draw primary detection information at the top of the frame            primary_text = f"Injury: {primary_detection['injury_type']} ({primary_detection['confidence']:.2f})"
+            
+            # Convert age_group to readable format
+            age_group_readable = primary_detection['age_group'].replace('age_', '').replace('_', '-')
+            if age_group_readable == '61-plus':
+                age_group_readable = '61+'
+                
+            # Fix gender display (change "man" to "male")
+            gender = primary_detection['gender']
+            if gender == "man":
+                gender = "male"
+                
+            person_text = f"Age Group: {age_group_readable} years, Gender: {gender}"
             
             cv2.putText(annotated_frame, primary_text, (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)

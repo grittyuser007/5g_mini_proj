@@ -209,10 +209,22 @@ class AccidentAnalysisAgent:
             injury_label = f"Injury: {detection_result['injury_type']} ({detection_result['confidence']:.2f})"
             cv2.putText(annotated, injury_label, (x1, y1-40), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+          # Add demographic information (only age range, not exact age)
+        age_group = detection_result.get('age_group', 'Unknown')
+        age_group_readable = {
+            'age_0_20': '0-20 years',
+            'age_21_40': '21-40 years', 
+            'age_41_60': '41-60 years',
+            'age_61_plus': '61+ years'
+        }.get(age_group, age_group)
         
-        # Add demographic information
-        age_text = f"Age: {detection_result.get('age', 'Unknown')} ({detection_result.get('age_group', 'Unknown')})"
-        gender_text = f"Gender: {detection_result.get('gender', 'Unknown')} ({detection_result.get('gender_confidence', 0):.2f})"
+        # Fix gender display (change "man" to "male")
+        gender = detection_result.get('gender', 'Unknown')
+        if gender == "man":
+            gender = "male"
+            
+        age_text = f"Age Group: {age_group_readable}"
+        gender_text = f"Gender: {gender} ({detection_result.get('gender_confidence', 0):.2f})"
         
         cv2.putText(annotated, age_text, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
@@ -244,11 +256,14 @@ class AccidentAnalysisAgent:
             'age_41_60': '41-60 years',
             'age_61_plus': '61+ years'
         }.get(age_group, age_group)
-        
+          # Fix gender display (change "man" to "male")
+        if gender == "man":
+            gender = "male"
+            
         if injury == 'no_injury':
-            summary = f"Analysis shows a {gender} individual, approximately {age} years old (age group: {age_group_readable}), with no visible injuries detected in this image."
+            summary = f"Analysis shows a {gender} individual, age group: {age_group_readable}, with no visible injuries detected in this image."
         else:
-            summary = f"Analysis shows a {gender} individual, approximately {age} years old (age group: {age_group_readable}), with a detected {injury} injury (confidence: {confidence:.1%}). Medical attention may be required."
+            summary = f"Analysis shows a {gender} individual, age group: {age_group_readable}, with a detected {injury} injury (confidence: {confidence:.1%}). Medical attention may be required."
         
         return summary
     
@@ -335,11 +350,17 @@ class AccidentAnalysisAgent:
         
         # Summary Statistics
         story.append(Paragraph("ANALYSIS SUMMARY", subtitle_style))
-        
-        # Calculate statistics
+          # Calculate statistics
         injury_types = [r['injury_type'] for r in self.analysis_results]
         age_groups = [r['age_group'] for r in self.analysis_results]
-        genders = [r['gender'] for r in self.analysis_results]
+        
+        # Fix gender display (change "man" to "male")
+        genders = []
+        for r in self.analysis_results:
+            gender = r['gender']
+            if gender == "man":
+                gender = "male"
+            genders.append(gender)
         
         # Create summary statistics
         injury_counts = pd.Series(injury_types).value_counts().to_dict()
@@ -354,8 +375,7 @@ class AccidentAnalysisAgent:
         
         Age Group Distribution:
         {chr(10).join([f"• {age_group.replace('age_', '').replace('_', '-') + ' years' if age_group != 'age_61_plus' else '61+ years'}: {count} individuals" for age_group, count in age_group_counts.items()])}
-        
-        Gender Distribution:
+          Gender Distribution:
         {chr(10).join([f"• {gender.title()}: {count} individuals" for gender, count in gender_counts.items()])}
         """
         
@@ -389,13 +409,19 @@ class AccidentAnalysisAgent:
                 story.append(Paragraph(f"Error loading images: {str(e)}", styles['Normal']))
                 story.append(Spacer(1, 10))
             
-            # Analysis details table
+            # Analysis details table            # Format age group
+            age_group_readable = result['age_group'].replace('age_', '').replace('_', '-') + ' years' if result['age_group'] != 'age_61_plus' else '61+ years'
+            
+            # Fix gender display (change "man" to "male")
+            gender = result['gender']
+            if gender == "man":
+                gender = "male"
+                
             analysis_data = [
                 ['Analysis Component', 'Result', 'Confidence'],
                 ['Injury Type', result['injury_type'], f"{result['injury_confidence']:.1%}"],
-                ['Age', str(result['age']), 'N/A'],
-                ['Age Group', result['age_group'].replace('age_', '').replace('_', '-') + ' years' if result['age_group'] != 'age_61_plus' else '61+ years', 'N/A'],
-                ['Gender', result['gender'].title(), f"{result['gender_confidence']:.1%}"],
+                ['Age Group', age_group_readable, 'N/A'],
+                ['Gender', gender.title(), f"{result['gender_confidence']:.1%}"],
                 ['Analysis Time', result['timestamp'], 'N/A']
             ]
             

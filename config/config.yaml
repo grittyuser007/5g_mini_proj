@@ -1,18 +1,14 @@
 models:
   yolo:
-    path: "models/yolov8n.pt"
-    confidence_threshold: 0.45  # Updated to match detection threshold
+    path: "models/injury_detection_model/weights/best.pt"  # Use your trained 4-class model
+    confidence_threshold: 0.25  # Lower threshold for better detection
     device: "gpu"  # can be "cpu" or "gpu"
+    enhanced_mode: true  # Use enhanced detector for better results
     injury_classes:
-      - burn
-      - cut
-      - bruise
-      - fracture
-      - sprain
-      - head_injury
-      - laceration
-      - abrasion
-      - no_injury
+      - male
+      - female
+      - injury
+      - no injury
     age_group_classes:
       - age_0_20
       - age_21_40
@@ -29,7 +25,7 @@ cloud:
   database_url: "https://ai-accident-analysis-default-rtdb.firebaseio.com"
 
 camera:
-  device_id: 2 # Using camera ID 2
+  device_id: 1 # Using camera ID 2
   width: 1920 
   height: 1080
   fps: 30  # Reduced from 60 to improve performance

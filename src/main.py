@@ -101,7 +101,17 @@ def process_video(video_path, detector, reporter):
             if os.path.exists(temp_img_path):
                 os.remove(temp_img_path)
             
-            print(f"Detected: {result['injury_type']} - Age: {result['age']} - Gender: {result['gender']}")
+            # Convert age_group to readable format
+            age_group_readable = result['age_group'].replace('age_', '').replace('_', '-')
+            if age_group_readable == '61-plus':
+                age_group_readable = '61+'
+                
+            # Fix gender display
+            gender = result['gender']
+            if gender == "man":
+                gender = "male"
+                
+            print(f"Detected: {result['injury_type']} - Age Group: {age_group_readable} years - Gender: {gender}")
     
     print("Processing video... Press 'q' to quit.")
     
@@ -120,10 +130,20 @@ def process_video(video_path, detector, reporter):
         # Skip frames to maintain smooth video but always display
         if frame_count % frame_skip != 0:
             # Just display the frame without processing
-            if latest_result and latest_result["success"]:
-                # Add previous detection info to current frame for display
+            if latest_result and latest_result["success"]:                # Add previous detection info to current frame for display
                 info_text = f"Injury: {latest_result['injury_type']} ({latest_result['confidence']:.2f})"
-                person_text = f"Age: {latest_result['age']}, Gender: {latest_result['gender']}"
+                
+                # Convert age_group to readable format
+                age_group_readable = latest_result['age_group'].replace('age_', '').replace('_', '-')
+                if age_group_readable == '61-plus':
+                    age_group_readable = '61+'
+                
+                # Fix gender display (change "man" to "male")
+                gender = latest_result['gender']
+                if gender == "man":
+                    gender = "male"
+                
+                person_text = f"Age Group: {age_group_readable} years, Gender: {gender}"
                 
                 cv2.putText(display_frame, info_text, (10, 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -145,11 +165,21 @@ def process_video(video_path, detector, reporter):
         if current_time - last_report_time >= report_interval and not processing_active:
             last_report_time = current_time
             threading.Thread(target=process_frame_background, args=(frame.copy(),)).start()
-        
-        # Draw results on frame if available
+          # Draw results on frame if available
         if latest_result and latest_result["success"]:
             info_text = f"Injury: {latest_result['injury_type']} ({latest_result['confidence']:.2f})"
-            person_text = f"Age: {latest_result['age']}, Gender: {latest_result['gender']}"
+            
+            # Convert age_group to readable format
+            age_group_readable = latest_result['age_group'].replace('age_', '').replace('_', '-')
+            if age_group_readable == '61-plus':
+                age_group_readable = '61+'
+            
+            # Fix gender display (change "man" to "male")
+            gender = latest_result['gender']
+            if gender == "man":
+                gender = "male"
+            
+            person_text = f"Age Group: {age_group_readable} years, Gender: {gender}"
             
             cv2.putText(display_frame, info_text, (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)

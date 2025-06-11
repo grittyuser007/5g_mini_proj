@@ -1,5 +1,6 @@
 import os
 import argparse
+import torch
 from ultralytics import YOLO
 
 def train_custom_model(epochs=100, batch_size=16, img_size=640, data_yaml='data/custom_dataset/data.yaml'):
@@ -13,19 +14,24 @@ def train_custom_model(epochs=100, batch_size=16, img_size=640, data_yaml='data/
         data_yaml: Path to the dataset YAML file
     """
     # Create models directory if it doesn't exist
-    os.makedirs('models', exist_ok=True)
-    
-    # Initialize the model - use YOLOv8n as base model
+    os.makedirs('models', exist_ok=True)    # Initialize the model - use YOLOv8n as base model
     model = YOLO('yolov8n.pt')  # Load a pretrained YOLOv8n model
     
-    # Set training arguments
+    # Force GPU usage if available
+    if torch.cuda.is_available():
+        print(f"✅ CUDA available! Using GPU: {torch.cuda.get_device_name(0)}")
+        device = 0
+    else:
+        print("⚠️ CUDA not available, using CPU")
+        device = 'cpu'
+      # Set training arguments
     args = {
         'data': data_yaml,
         'epochs': epochs,
         'imgsz': img_size,
         'batch': batch_size,
         'patience': 50,  # Early stopping patience
-        'device': 0 if model.device.type == 'cuda' else 'cpu',
+        'device': device,  # Use the device we determined above
         'project': 'models',
         'name': 'injury_detection_model',
         'exist_ok': True,
@@ -36,7 +42,7 @@ def train_custom_model(epochs=100, batch_size=16, img_size=640, data_yaml='data/
         'conf': 0.001,            # Low confidence threshold for training
         'rect': True,             # Use rectangular training
         'cos_lr': True,           # Use cosine learning rate
-        'multithreading': True    # Enable multithreading for faster training
+        'workers': 0              # Disable multiprocessing workers on Windows
     }
     
     # Start training
@@ -78,4 +84,6 @@ def main():
     )
 
 if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

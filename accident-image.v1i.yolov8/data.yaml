@@ -1,0 +1,13 @@
+train: E:/5g_miniproject/accident-image.v1i.yolov8/train/images
+val: E:/5g_miniproject/accident-image.v1i.yolov8/valid/images
+test: E:/5g_miniproject/accident-image.v1i.yolov8/test/images
+
+nc: 4
+names: ['male', 'female', 'injury', 'no injury']
+
+roboflow:
+  workspace: hawkeye-3btbw
+  project: accident-image
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/hawkeye-3btbw/accident-image/dataset/1

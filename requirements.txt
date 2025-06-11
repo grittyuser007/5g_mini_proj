@@ -2,7 +2,7 @@ opencv-python==4.8.0.74
 numpy==1.24.3
 tensorflow==2.13.0
 keras==2.13.1
-pillow==10.0.0
+pillow==9.4.0           # Changed from 10.0.0 to 9.4.0 to satisfy all dependencies
 matplotlib==3.7.2
 scikit-learn==1.3.0
 pandas==2.0.3
@@ -15,8 +15,8 @@ torchvision==0.15.2
 ultralytics==8.0.145
 tqdm==4.66.1
 pycocotools==2.0.6
-roboflow==1.1.9  # For dataset management
-seaborn==0.12.2  # For visualization in model evaluation
-albumentations==1.3.1  # For advanced image augmentation
-supervision==0.14.0  # For YOLOv8 visualization
-thop==0.1.1  # For model complexity analysis
+roboflow==1.1.9
+seaborn==0.12.2
+albumentations==1.3.1
+supervision==0.14.0
+thop==0.1.1.post2209072238  # Specify valid available version
